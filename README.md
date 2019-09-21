@@ -13,9 +13,14 @@ env GOOS=linux GOARCH=amd64 go build -o /tmp/main
 zip -j /tmp/main.zip /tmp/main
 ```
 
-* Deploy
+* ENV VARIABLES
 ```
 ACCOUNT_ID=....
+ZONE=us-east-1
+```
+
+* Deploy
+```
 aws lambda create-function --function-name books --runtime go1.x \
 --role arn:aws:iam::${ACCOUNT_ID}:role/lambda-books-executor \
 --handler main --zip-file fileb:///tmp/main.zip
@@ -41,25 +46,68 @@ aws dynamodb put-item --table-name Books --item '{"ISBN": {"S": "978-1420931693"
 aws dynamodb put-item --table-name Books --item '{"ISBN": {"S": "978-0486298238"}, "Title": {"S": "Meditations"},  "Author":  {"S": "Marcus Aurelius"}}'
 ```
 
-
-AWS sessions and profiles
----------------------------
-* https://aws.amazon.com/premiumsupport/knowledge-center/authenticate-mfa-cli/
-
-
-Use MFA for Console Only
----------------------------
-* https://stackoverflow.com/questions/28177505/enforce-mfa-for-aws-console-login-but-not-for-api-calls/41050898#41050898?newreg=138803454f2c4298ad70b570139f7923
-
-
-# Yubikey (NOT WORKING ON CHROMEBOOK)
----------------------------
-* https://developers.yubico.com/yubikey-personalization/
-* https://developers.yubico.com/yubikey-manager/
-
+* Rebuild and redeploy
 ```
-sudo apt install libyubikey-dev
-sudo apt install pkg-config
-sudo apt install libusb-1.0-0-dev libusb-dev libjson-c-dev
-pip install yubikey-manager
+env GOOS=linux GOARCH=amd64 go build -o /tmp/main
+zip -j /tmp/main.zip /tmp/main
+aws lambda update-function-code --function-name books --zip-file fileb:///tmp/main.zip
+```
+
+* Add new policy to role for dynamodb access
+```
+aws iam put-role-policy --role-name lambda-books-executor \
+--policy-name dynamodb-item-crud-role \
+--policy-document file://./dynamodb-privilege-policy.json --profile admin
+```
+
+* Create API gateway
+```
+aws apigateway create-rest-api --name bookstore
+REST_API_ID=....
+```
+
+* Get the id of the root API resource ("/")
+```
+aws apigateway get-resources --rest-api-id ${REST_API_ID}
+ROOT_PATH_ID=....
+```
+
+* Create /books
+```
+aws apigateway create-resource --rest-api-id ${REST_API_ID} --parent-id ${ROOT_PATH_ID} --path-part books --profile admin
+RESOURCE_ID=....
+```
+
+* Configure API gateway to respond to ANY HTTP method
+```
+aws apigateway put-method --rest-api-id ${REST_API_ID} \
+--resource-id ${RESOURCE_ID} --http-method ANY \
+--authorization-type NONE
+```
+
+* Connect the gateway to proxy with POST to the lambda function
+```
+aws apigateway put-integration --rest-api-id ${REST_API_ID} \
+--resource-id ${RESOURCE_ID} --http-method ANY --type AWS_PROXY \
+--integration-http-method POST \
+--uri arn:aws:apigateway:${ZONE}:lambda:path/2015-03-31/functions/arn:aws:lambda:${ZONE}:${ACCOUNT_ID}:function:books/invocations
+```
+
+* Test API gateway
+```
+aws apigateway test-invoke-method --rest-api-id ${REST_API_ID} --resource-id ${RESOURCE_ID} --http-method "GET"
+```
+
+* Add/fix permissions on 
+    * First build a GUID: https://www.guidgenerator.com/
+        GUID=....
+```
+aws lambda add-permission --function-name books --statement-id ${GUID} \
+--action lambda:InvokeFunction --principal apigateway.amazonaws.com \
+--source-arn arn:aws:execute-api:${ZONE}:${ACCOUNT_ID}:${REST_API_ID}/*/*/*
+```
+
+* Now fix the response for API gateway from lambda (in the Go code)
+```
+go get github.com/aws/aws-lambda-go/events
 ```
