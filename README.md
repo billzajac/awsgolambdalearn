@@ -145,3 +145,16 @@ aws apigateway test-invoke-method --rest-api-id ${REST_API_ID} --resource-id ${R
 aws logs filter-log-events --log-group-name /aws/lambda/books \
 --filter-pattern "ERROR"
 ```
+
+* Create Deployment
+```
+aws apigateway create-deployment --rest-api-id ${REST_API_ID} \
+--stage-name staging
+```
+
+* Test Deployment
+```
+curl https://${REST_API_ID}.execute-api.us-east-1.amazonaws.com/staging/books?isbn=978-1420931693
+curl https://${REST_API_ID}.execute-api.us-east-1.amazonaws.com/staging/books?isbn=foobar
+
+```
