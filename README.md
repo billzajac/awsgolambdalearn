@@ -1,5 +1,10 @@
 * https://www.alexedwards.net/blog/serverless-api-with-go-and-aws-lambda
 
+* Deploy with Ansible
+```
+ansible-playbook deploy.yml
+```
+
 * Initial setup of role
 ```
 aws iam create-role --role-name lambda-books-executor --assume-role-policy-document file://./trust-policy.json --profile admin
@@ -107,7 +112,36 @@ aws lambda add-permission --function-name books --statement-id ${GUID} \
 --source-arn arn:aws:execute-api:${ZONE}:${ACCOUNT_ID}:${REST_API_ID}/*/*/*
 ```
 
+* Test API gateway
+```
+aws apigateway test-invoke-method --rest-api-id ${REST_API_ID} --resource-id ${RESOURCE_ID} --http-method "GET"
+```
+
 * Now fix the response for API gateway from lambda (in the Go code)
 ```
 go get github.com/aws/aws-lambda-go/events
+
+# Update the code to use the new structs
+vi books/main.go
+
+cd books && \
+env GOOS=linux GOARCH=amd64 go build -o /tmp/main && \
+zip -j /tmp/main.zip /tmp/main && \
+aws lambda update-function-code --function-name books --zip-file fileb:///tmp/main.zip
+```
+
+* Test API gateway
+```
+aws apigateway test-invoke-method --rest-api-id ${REST_API_ID} --resource-id ${RESOURCE_ID} --http-method "GET" \
+--path-with-query-string "/books?isbn=978-1420931693"
+
+# Test book that isn't in the DB
+aws apigateway test-invoke-method --rest-api-id ${REST_API_ID} --resource-id ${RESOURCE_ID} --http-method "GET" \
+--path-with-query-string "/books?isbn=foobar"
+```
+
+* Query Cloudwatch
+```
+aws logs filter-log-events --log-group-name /aws/lambda/books \
+--filter-pattern "ERROR"
 ```

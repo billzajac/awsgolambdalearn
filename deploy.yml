@@ -1,0 +1,40 @@
+---
+- hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    code_dir: /home/billzajac/go/src/github.com/billzajac/awsgolambdalearn/books
+
+  tasks:
+    - name: Compile code
+      command: "go build -o main"
+      environment:
+        GOOS: "linux"
+        GOARCH: "amd64"
+      args:
+        chdir: '{{ code_dir }}'
+
+    - name: Zip the compiled binary (needed for AWS)
+      archive:
+        path: books/main
+        dest: main.zip
+        format: zip
+
+    - name: Create Lambda function
+      lambda:
+        name: books
+        region: us-east-1
+        zip_file: "main.zip"
+        state: present
+        role: lambda-books-executor
+        runtime: "go1.x"
+        handler: "main"
+
+    - name: Cleanup compiled binary and zip
+      file:
+        path: "{{ item }}"
+        state: absent
+      with_items:
+        - books/main
+        - main.zip
