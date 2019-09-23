@@ -175,3 +175,8 @@ curl https://${REST_API_ID}.execute-api.us-east-1.amazonaws.com/staging/books?is
 ```
 cw tail -f /aws/lambda/books
 ```
+
+Further Reading (sample code for Go and dynamodb)
+-------------------
+* https://docs.aws.amazon.com/sdk-for-go/v1/developer-guide/using-dynamodb-with-go-sdk.html
+* https://github.com/nerdguru/go-sls-crudl
