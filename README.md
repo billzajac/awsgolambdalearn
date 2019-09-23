@@ -156,5 +156,22 @@ aws apigateway create-deployment --rest-api-id ${REST_API_ID} \
 ```
 curl https://${REST_API_ID}.execute-api.us-east-1.amazonaws.com/staging/books?isbn=978-1420931693
 curl https://${REST_API_ID}.execute-api.us-east-1.amazonaws.com/staging/books?isbn=foobar
+```
 
+* Test creating a new book with POST
+```
+curl -i -H "Content-Type: application/json" -X POST \
+-d '{"isbn":"978-0141439587", "title":"Emma", "author": "Jane Austen"}' \
+https://${REST_API_ID}.execute-api.us-east-1.amazonaws.com/staging/books
+```
+
+* Test GET of that new book
+```
+curl https://${REST_API_ID}.execute-api.us-east-1.amazonaws.com/staging/books?isbn=978-0141439587
+```
+
+* Tail CloudWatch logs
+    * https://github.com/lucagrulla/cw
+```
+cw tail -f /aws/lambda/books
 ```
